@@ -1,0 +1,9 @@
+dlt[filesystem,clickhouse,az]>=1.0.0
+pyarrow>=17.0.0
+pyiceberg[pyarrow,s3fs]>=0.8.0
+s3fs>=2024.0.0
+adlfs>=2024.0.0
+clickhouse-connect>=0.8.0
+requests>=2.32.0
+python-dotenv>=1.0.0
+tzdata>=2024.1

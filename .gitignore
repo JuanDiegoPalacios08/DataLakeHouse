@@ -1,0 +1,22 @@
+# Credenciales y configuracion local
+.dlt/
+.dtl/
+.env
+*.env
+
+# Datos y evidencias generadas localmente
+data/
+evidencias/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Sistema operativo / editores
+.DS_Store
+Thumbs.db
+.vscode/

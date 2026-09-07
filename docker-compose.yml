@@ -1,0 +1,86 @@
+services:
+  minio:
+    image: quay.io/minio/minio:latest
+    container_name: proyecto_minio
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+      MINIO_REGION_NAME: us-east-1
+    volumes:
+      - minio_data:/data
+
+  createbuckets:
+    image: quay.io/minio/mc:latest
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      until mc alias set local http://minio:9000 minioadmin minioadmin; do
+        echo 'Esperando MinIO...';
+        sleep 2;
+      done;
+      mc mb -p local/raw || true;
+      mc mb -p local/warehouse || true;
+      mc ls local;
+      exit 0;
+      "
+
+  nessie:
+    image: ghcr.io/projectnessie/nessie:0.108.4
+    container_name: proyecto_nessie
+    depends_on:
+      - minio
+      - createbuckets
+    ports:
+      - "19120:19120"
+    environment:
+      - nessie.version.store.type=IN_MEMORY
+      - nessie.catalog.default-warehouse=warehouse
+      - nessie.catalog.warehouses.warehouse.location=s3://warehouse/
+      - nessie.catalog.service.s3.default-options.region=us-east-1
+      - nessie.catalog.service.s3.default-options.endpoint=http://minio:9000/
+      - nessie.catalog.service.s3.default-options.external-endpoint=http://minio:9000/
+      - nessie.catalog.service.s3.default-options.path-style-access=true
+      - nessie.catalog.service.s3.default-options.auth-type=STATIC
+      - nessie.catalog.service.s3.default-options.access-key=urn:nessie-secret:quarkus:nessie.catalog.secrets.access-key
+      - nessie.catalog.secrets.access-key.name=minioadmin
+      - nessie.catalog.secrets.access-key.secret=minioadmin
+      - nessie.server.authentication.enabled=false
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:latest
+    container_name: proyecto_clickhouse
+    ports:
+      - "8123:8123"
+      - "9002:9000"
+    environment:
+      CLICKHOUSE_DB: default
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: clickhouse
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+
+  jupyter:
+    image: quay.io/jupyter/base-notebook:python-3.11
+    container_name: proyecto_jupyter
+    depends_on:
+      - minio
+      - nessie
+      - clickhouse
+    ports:
+      - "8888:8888"
+    working_dir: /home/jovyan/work
+    volumes:
+      - .:/home/jovyan/work
+    command: >
+      bash -lc "pip install -r requirements.txt &&
+      start-notebook.py --ServerApp.token='' --ServerApp.password=''"
+
+volumes:
+  minio_data:
+  clickhouse_data:
